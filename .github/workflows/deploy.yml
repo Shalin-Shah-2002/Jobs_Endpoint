@@ -1,0 +1,97 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            REPO_DIR="/home/${{ secrets.EC2_USER }}/Jobs_Endpoint"
+            SERVICE="jobs-endpoint"
+            REPO_URL="https://github.com/Shalin-Shah-2002/Jobs_Endpoint.git"
+
+            echo "=== Step 1: Clone repo if missing ==="
+            if [ ! -d "$REPO_DIR/.git" ]; then
+              git clone "$REPO_URL" "$REPO_DIR"
+            fi
+
+            echo "=== Step 2: Pull latest ==="
+            cd "$REPO_DIR"
+            git fetch --all
+            git reset --hard origin/main
+
+            echo "=== Step 3: Create venv if missing ==="
+            if [ ! -d ".venv" ]; then
+              python3 -m venv .venv
+            fi
+            source .venv/bin/activate
+
+            echo "=== Step 4: Install dependencies ==="
+            pip install -e .
+
+            echo "=== Step 5: Create .env if missing ==="
+            if [ ! -f ".env" ]; then
+              cat > .env <<EOF
+            JOBS_API_KEY=${{ secrets.JOBS_API_KEY }}
+            JOBS_DATABASE_URL=sqlite:///./jobs.db
+            JOBS_ENABLE_MOCK_SOURCE=true
+            JOBS_READ_RATE_LIMIT=120
+            JOBS_WRITE_RATE_LIMIT=10
+            EOF
+            fi
+
+            echo "=== Step 6: Create systemd unit if missing ==="
+            if [ ! -f "/etc/systemd/system/$SERVICE.service" ]; then
+              sudo tee /etc/systemd/system/$SERVICE.service > /dev/null <<UNIT
+            [Unit]
+            Description=Jobs Endpoint API
+            After=network.target
+
+            [Service]
+            User=${{ secrets.EC2_USER }}
+            WorkingDirectory=$REPO_DIR
+            ExecStart=$REPO_DIR/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+            Restart=always
+            EnvironmentFile=$REPO_DIR/.env
+
+            [Install]
+            WantedBy=multi-user.target
+            UNIT
+              sudo systemctl daemon-reload
+              sudo systemctl enable $SERVICE
+            fi
+
+            echo "=== Step 7: Grant sudoers if missing ==="
+            if [ ! -f "/etc/sudoers.d/$SERVICE" ]; then
+              echo "${{ secrets.EC2_USER }} ALL=(ALL) NOPASSWD: /bin/systemctl restart $SERVICE, /bin/systemctl status $SERVICE" | sudo tee /etc/sudoers.d/$SERVICE > /dev/null
+            fi
+
+            echo "=== Step 8: Restart service ==="
+            sudo systemctl restart $SERVICE
+            sleep 2
+
+            echo "=== Step 9: Health check ==="
+            if systemctl is-active --quiet $SERVICE; then
+              echo "Service is running"
+            else
+              echo "Service failed to start"
+              sudo journalctl -u $SERVICE --no-pager -n 20
+              exit 1
+            fi
+
+            echo "=== Step 10: Smoke test ==="
+            curl -fsS http://127.0.0.1:8000/health || { echo "Health check failed"; exit 1; }
+
+            echo "=== Deploy complete ==="
