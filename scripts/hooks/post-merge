@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Auto-log merges to Second Brain vault
+set -euo pipefail
+
+VAULT="/Users/shalinshah/Library/CloudStorage/GoogleDrive-2002shalin@gmail.com/My Drive/Obsi/Second-Brain"
+LOG_DIR="$VAULT/09_Logs/CodingSessions"
+PROJECT_NAME="jobs-endpoint"
+
+TODAY=$(date +%Y-%m-%d)
+LOG_FILE="$LOG_DIR/$TODAY-CodingSession.md"
+TIME=$(date +%H:%M)
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+MERGED_BRANCH=$(git rev-parse --abbrev-ref HEAD@{1} 2>/dev/null || echo "unknown")
+
+mkdir -p "$LOG_DIR"
+
+if [ ! -f "$LOG_FILE" ]; then
+	cat > "$LOG_FILE" << 'FRONTMATTER'
+---
+tags: [type/log, project/active]
+created: TODAY_PLACEHOLDER
+status: published
+project: PROJECT_PLACEHOLDER
+---
+
+# Coding Session — TODAY_PLACEHOLDER
+
+## Context
+- **Project:** [[PROJECT_PLACEHOLDER]]
+- **Branch:** BRANCH_PLACEHOLDER
+- **Goal:** _(auto-generated session — add goal manually)_
+
+## Log
+| Time | Action | Result | Notes |
+|---|---|---|---|
+FRONTMATTER
+
+	sed -i '' "s/TODAY_PLACEHOLDER/$TODAY/g" "$LOG_FILE"
+	sed -i '' "s/PROJECT_PLACEHOLDER/$PROJECT_NAME/g" "$LOG_FILE"
+	sed -i '' "s/BRANCH_PLACEHOLDER/$BRANCH/g" "$LOG_FILE"
+fi
+
+printf "| %s | Merge \`%s\` into \`%s\` | — | — |\n" "$TIME" "$MERGED_BRANCH" "$BRANCH" >> "$LOG_FILE"

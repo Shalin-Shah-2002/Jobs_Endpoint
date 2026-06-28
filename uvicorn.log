@@ -1,0 +1,14 @@
+INFO:     Started server process [32610]
+INFO:     Waiting for application startup.
+============================================================
+Jobs Endpoint v0.2.0
+------------------------------------------------------------
+  Swagger UI:  http://127.0.0.1:8000/docs
+  OpenAPI:     http://127.0.0.1:8000/openapi.json
+  ReDoc:       http://127.0.0.1:8000/redoc
+  Health:      http://127.0.0.1:8000/health
+  API base:    http://127.0.0.1:8000/api/v1
+============================================================
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:59293 - "GET / HTTP/1.1" 404 Not Found
