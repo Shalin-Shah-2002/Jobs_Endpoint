@@ -19,12 +19,13 @@ jobs:
             set -euo pipefail
 
             echo "=== Installing prerequisites ==="
-            if command -v apt-get &>/dev/null; then
+            if command -v dnf &>/dev/null; then
+              sudo dnf install -y python3.11 python3.11-pip
+            elif command -v apt-get &>/dev/null; then
               sudo apt-get update -qq
-              sudo apt-get install -y -qq git python3-venv
-            elif command -v yum &>/dev/null; then
-              sudo yum install -y -q git python3
+              sudo apt-get install -y -qq git python3.11 python3.11-venv
             fi
+            command -v git &>/dev/null || (sudo dnf install -y git 2>/dev/null || sudo apt-get install -y -qq git)
 
             REPO_DIR="/home/${{ secrets.EC2_USER }}/Jobs_Endpoint"
             SERVICE="jobs-endpoint"
@@ -42,7 +43,7 @@ jobs:
 
             echo "=== Step 3: Create venv if missing ==="
             if [ ! -d ".venv" ]; then
-              python3 -m venv .venv
+              python3.11 -m venv .venv
             fi
             source .venv/bin/activate
 
