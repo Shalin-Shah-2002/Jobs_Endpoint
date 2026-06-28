@@ -41,10 +41,9 @@ jobs:
             git fetch --all
             git reset --hard origin/main
 
-            echo "=== Step 3: Create venv if missing ==="
-            if [ ! -d ".venv" ]; then
-              python3.11 -m venv .venv
-            fi
+            echo "=== Step 3: Recreate venv with python3.11 ==="
+            rm -rf .venv
+            python3.11 -m venv .venv
             source .venv/bin/activate
 
             echo "=== Step 4: Install dependencies ==="
