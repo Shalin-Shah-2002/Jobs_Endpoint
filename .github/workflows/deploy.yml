@@ -18,6 +18,14 @@ jobs:
           script: |
             set -euo pipefail
 
+            echo "=== Installing prerequisites ==="
+            if command -v apt-get &>/dev/null; then
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq git python3-venv
+            elif command -v yum &>/dev/null; then
+              sudo yum install -y -q git python3
+            fi
+
             REPO_DIR="/home/${{ secrets.EC2_USER }}/Jobs_Endpoint"
             SERVICE="jobs-endpoint"
             REPO_URL="https://github.com/Shalin-Shah-2002/Jobs_Endpoint.git"
