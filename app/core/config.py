@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = Field(default=60, ge=1, le=3600)
     alert_check_interval_seconds: int = Field(default=60, ge=10, le=3600)
     notification_timeout_seconds: float = Field(default=10.0, ge=1.0, le=120.0)
+    discord_bot_token: str = ""
+    discord_public_key: str = ""
+    discord_guild_id: int | None = None
 
 
 @lru_cache
