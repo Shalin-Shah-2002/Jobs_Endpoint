@@ -103,17 +103,15 @@ def main() -> int:
 
     print(f"Registering {len(COMMANDS)} command(s) with guild {guild_id}…")
     with httpx.Client(timeout=30.0) as client:
-        # Discord expects a single command per PUT. Issue one PUT per command.
-        for cmd in COMMANDS:
-            resp = client.put(url, headers=headers, json=cmd)
-            if resp.status_code >= 400:
-                print(
-                    f"  ✗ {cmd['name']}: {resp.status_code} {resp.text[:300]}",
-                    file=sys.stderr,
-                )
-                return 1
-            data = resp.json()
-            print(f"  ✓ {data.get('name')} (id: {data.get('id')})")
+        resp = client.put(url, headers=headers, json=COMMANDS)
+        if resp.status_code >= 400:
+            print(
+                f"  ✗ {resp.status_code} {resp.text[:500]}",
+                file=sys.stderr,
+            )
+            return 1
+        for cmd in resp.json():
+            print(f"  ✓ {cmd.get('name')} (id: {cmd.get('id')})")
 
     print("Done. Commands are now available in the guild (instant sync).")
     return 0
