@@ -93,4 +93,8 @@ class AlertScheduler:
         if alert.last_run_at is None:
             return True
         interval = timedelta(minutes=alert.check_interval_minutes)
-        return alert.last_run_at + interval <= now
+        last_run = alert.last_run_at
+        # SQLite stores datetimes without timezone info; assume UTC when naive.
+        if last_run.tzinfo is None:
+            last_run = last_run.replace(tzinfo=now.tzinfo)
+        return last_run + interval <= now
