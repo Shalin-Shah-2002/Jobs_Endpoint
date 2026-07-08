@@ -88,11 +88,6 @@ class WellfoundSource:
             _SEARCH_URL,
             params=params,
             impersonate="chrome131",
-            headers={
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "DNT": "1",
-            },
             timeout=20,
         )
 

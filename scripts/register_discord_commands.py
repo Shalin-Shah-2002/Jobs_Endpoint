@@ -57,7 +57,7 @@ COMMANDS: list[dict[str, Any]] = [
                 "description": "Trigger an alert immediately.",
                 "type": 1,
                 "options": [
-                    {"name": "alert_id", "description": "Alert ID (from /alert list).", "type": 3, "required": True},
+                    {"name": "alert_id", "description": "Alert ID (from /alert list).", "type": 3, "required": True, "autocomplete": True},
                 ],
             },
             {
@@ -65,7 +65,7 @@ COMMANDS: list[dict[str, Any]] = [
                 "description": "Send a test notification through the alert's webhooks.",
                 "type": 1,
                 "options": [
-                    {"name": "alert_id", "description": "Alert ID (from /alert list).", "type": 3, "required": True},
+                    {"name": "alert_id", "description": "Alert ID (from /alert list).", "type": 3, "required": True, "autocomplete": True},
                 ],
             },
         ],

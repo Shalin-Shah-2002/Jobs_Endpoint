@@ -289,6 +289,38 @@ COMMAND_REGISTRY: dict[str, Any] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Autocomplete — suggest alert IDs as the user types
+# ---------------------------------------------------------------------------
+async def autocomplete_alert_id(
+    focused_value: str,
+    container: Container,
+    session_factory: sessionmaker,
+    max_choices: int = 25,
+) -> list[dict[str, Any]]:
+    """Return up to 25 alert choices matching the user's typed prefix."""
+    session = session_factory()
+    try:
+        from app.repositories.job_alert_repository import JobAlertRepository
+        repo = JobAlertRepository(session)
+        all_alerts = repo.list_all(enabled_only=False)
+    finally:
+        session.close()
+
+    query = focused_value.lower()
+    matches = [
+        a for a in all_alerts
+        if query in a.id.lower() or query in a.name.lower()
+    ]
+    matches.sort(key=lambda a: (0 if a.id.lower().startswith(query) else 1, a.name))
+
+    choices: list[dict[str, Any]] = []
+    for a in matches[:max_choices]:
+        label = f"{a.name} ({a.id[:8]}…)" if len(a.id) > 8 else f"{a.name} ({a.id})"
+        choices.append({"name": label[:100], "value": a.id})
+    return choices
+
+
 def parse_options(raw_options: list[dict[str, Any]] | None) -> dict[str, Any]:
     """Flatten Discord option array into a dict by name."""
     if not raw_options:

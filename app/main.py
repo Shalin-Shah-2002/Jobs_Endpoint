@@ -15,7 +15,6 @@ from app.discord.bot import create_bot, start_bot, stop_bot
 from app.models.registry import Job, SearchRun, SearchRunJob, SourceStatus  # noqa: F401  (registers models)
 from app.services.alert_scheduler import AlertScheduler
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = app.state.settings
