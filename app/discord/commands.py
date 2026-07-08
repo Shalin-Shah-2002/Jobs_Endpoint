@@ -321,6 +321,46 @@ async def autocomplete_alert_id(
     return choices
 
 
+# ---------------------------------------------------------------------------
+# Autocomplete — suggest previously-used webhook URLs as the user types
+# ---------------------------------------------------------------------------
+async def autocomplete_webhook_url(
+    focused_value: str,
+    container: Container,
+    session_factory: sessionmaker,
+    field: str = "discord_webhook_url",
+    max_choices: int = 25,
+) -> list[dict[str, Any]]:
+    """Return up to 25 webhook URL choices matching the user's typed prefix.
+
+    *field* must be ``"discord_webhook_url"`` or ``"slack_webhook_url"``.
+
+    URLs longer than 100 characters are excluded because Discord caps
+    autocomplete choice value/name at 100 chars.
+    """
+    session = session_factory()
+    try:
+        from app.repositories.job_alert_repository import JobAlertRepository
+
+        repo = JobAlertRepository(session)
+        urls = repo.list_distinct_webhook_urls(field)
+    finally:
+        session.close()
+
+    query = focused_value.lower()
+    matches = [u for u in urls if query in u.lower()]
+    matches.sort(key=lambda u: (0 if u.lower().startswith(query) else 1, u))
+
+    choices: list[dict[str, Any]] = []
+    for u in matches:
+        if len(u) > 100:
+            continue  # Discord rejects values > 100 chars
+        choices.append({"name": u, "value": u})
+        if len(choices) >= max_choices:
+            break
+    return choices
+
+
 def parse_options(raw_options: list[dict[str, Any]] | None) -> dict[str, Any]:
     """Flatten Discord option array into a dict by name."""
     if not raw_options:

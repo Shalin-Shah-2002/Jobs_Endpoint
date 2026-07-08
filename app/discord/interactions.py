@@ -24,7 +24,7 @@ from fastapi import APIRouter, Request, Response, status
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
-from app.discord.commands import autocomplete_alert_id, dispatch, execute_and_build_result, get_subcommand, parse_options
+from app.discord.commands import autocomplete_alert_id, autocomplete_webhook_url, dispatch, execute_and_build_result, get_subcommand, parse_options
 
 if TYPE_CHECKING:
     pass
@@ -133,23 +133,41 @@ async def interactions(request: Request) -> Response:
             media_type="application/json",
         )
 
-    # APPLICATION_COMMAND_AUTOCOMPLETE (type 4) — suggest alert IDs.
+    # APPLICATION_COMMAND_AUTOCOMPLETE (type 4) — suggest alert IDs / webhook URLs.
     if interaction_type == 4:
         data = payload.get("data") or {}
         options = data.get("options", [])
         sub, sub_opts = get_subcommand(options)
-        # Only autocomplete the alert_id field in run/test subcommands.
-        if sub in ("run", "test"):
-            focused = None
-            for opt in (sub_opts or []):
-                if opt.get("focused"):
-                    focused = opt.get("value", "")
-                    break
-            if focused is not None:
+
+        # Extract the focused option (name + typed value).
+        focused_name: str | None = None
+        focused_value: str | None = None
+        for opt in (sub_opts or []):
+            if opt.get("focused"):
+                focused_name = str(opt.get("name", ""))
+                focused_value = str(opt.get("value", ""))
+                break
+
+        if focused_value is not None:
+            # Autocomplete alert_id in run/test subcommands.
+            if sub in ("run", "test") and focused_name == "alert_id":
                 choices = await autocomplete_alert_id(
-                    focused,
+                    focused_value,
                     request.app.state.container,
                     request.app.state.session_factory,
+                )
+                return Response(
+                    status_code=status.HTTP_200_OK,
+                    content=json.dumps({"type": 8, "data": {"choices": choices}}),
+                    media_type="application/json",
+                )
+            # Autocomplete webhook URLs in create subcommand.
+            if sub == "create" and focused_name in ("discord_webhook_url", "slack_webhook_url"):
+                choices = await autocomplete_webhook_url(
+                    focused_value,
+                    request.app.state.container,
+                    request.app.state.session_factory,
+                    field=focused_name,
                 )
                 return Response(
                     status_code=status.HTTP_200_OK,

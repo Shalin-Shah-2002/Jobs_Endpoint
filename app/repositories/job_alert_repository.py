@@ -198,3 +198,21 @@ class JobAlertRepository:
 
     def count(self) -> int:
         return self._session.execute(select(func.count()).select_from(JobAlert)).scalar() or 0
+
+    _WEBHOOK_URL_COLUMNS = {"discord_webhook_url", "slack_webhook_url"}
+
+    def list_distinct_webhook_urls(self, column: str) -> list[str]:
+        """Return distinct non-empty webhook URL values for *column*.
+
+        *column* must be one of ``{"discord_webhook_url", "slack_webhook_url"}``.
+        """
+        if column not in self._WEBHOOK_URL_COLUMNS:
+            raise ValueError(f"Unknown webhook column: {column!r}")
+        col = getattr(JobAlert, column)
+        rows = (
+            self._session.query(col)
+            .filter(col.isnot(None), col != "")
+            .distinct()
+            .all()
+        )
+        return [r[0] for r in rows]
