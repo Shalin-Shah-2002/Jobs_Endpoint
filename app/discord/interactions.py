@@ -24,7 +24,17 @@ from fastapi import APIRouter, Request, Response, status
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
-from app.discord.commands import autocomplete_alert_id, autocomplete_webhook_url, dispatch, execute_and_build_result, get_subcommand, parse_options
+from app.discord.commands import (
+    autocomplete_alert_id,
+    autocomplete_job_id,
+    autocomplete_run_id,
+    autocomplete_webhook_url,
+    dispatch,
+    execute_and_build_result,
+    execute_search_and_build_result,
+    get_subcommand,
+    parse_options,
+)
 
 if TYPE_CHECKING:
     pass
@@ -102,6 +112,30 @@ async def _run_alert_background(
         )
 
 
+async def _run_search_background(
+    options: dict[str, Any],
+    application_id: str,
+    interaction_token: str,
+    bot_token: str,
+    container: Any,
+    session_factory: Any,
+) -> None:
+    """Background coroutine: execute the search, then send the result as a follow-up."""
+    try:
+        result = await execute_search_and_build_result(
+            options, container, session_factory
+        )
+        await _send_followup(application_id, interaction_token, bot_token, result)
+    except Exception:
+        logger.exception("Background search run failed")
+        await _send_followup(
+            application_id,
+            interaction_token,
+            bot_token,
+            {"content": "Internal error during search execution."},
+        )
+
+
 @router.post("/interactions")
 async def interactions(request: Request) -> Response:
     bot = getattr(request.app.state, "discord_bot", None)
@@ -149,8 +183,11 @@ async def interactions(request: Request) -> Response:
                 break
 
         if focused_value is not None:
-            # Autocomplete alert_id in run/test subcommands.
-            if sub in ("run", "test") and focused_name == "alert_id":
+            data = payload.get("data") or {}
+            command_name = data.get("name", "")
+
+            # Autocomplete alert_id in alert subcommands.
+            if command_name == "alert" and focused_name == "alert_id":
                 choices = await autocomplete_alert_id(
                     focused_value,
                     request.app.state.container,
@@ -161,13 +198,37 @@ async def interactions(request: Request) -> Response:
                     content=json.dumps({"type": 8, "data": {"choices": choices}}),
                     media_type="application/json",
                 )
-            # Autocomplete webhook URLs in create subcommand.
-            if sub == "create" and focused_name in ("discord_webhook_url", "slack_webhook_url"):
+            # Autocomplete webhook URLs in alert create subcommand.
+            if command_name == "alert" and sub == "create" and focused_name in ("discord_webhook_url", "slack_webhook_url"):
                 choices = await autocomplete_webhook_url(
                     focused_value,
                     request.app.state.container,
                     request.app.state.session_factory,
                     field=focused_name,
+                )
+                return Response(
+                    status_code=status.HTTP_200_OK,
+                    content=json.dumps({"type": 8, "data": {"choices": choices}}),
+                    media_type="application/json",
+                )
+            # Autocomplete job_id in jobs get subcommand.
+            if command_name == "jobs" and sub == "get" and focused_name == "job_id":
+                choices = await autocomplete_job_id(
+                    focused_value,
+                    request.app.state.container,
+                    request.app.state.session_factory,
+                )
+                return Response(
+                    status_code=status.HTTP_200_OK,
+                    content=json.dumps({"type": 8, "data": {"choices": choices}}),
+                    media_type="application/json",
+                )
+            # Autocomplete run_id in search status subcommand.
+            if command_name == "search" and sub == "status" and focused_name == "run_id":
+                choices = await autocomplete_run_id(
+                    focused_value,
+                    request.app.state.container,
+                    request.app.state.session_factory,
                 )
                 return Response(
                     status_code=status.HTTP_200_OK,
@@ -188,29 +249,47 @@ async def interactions(request: Request) -> Response:
         )
 
     data = payload.get("data") or {}
+    command_name = data.get("name", "")  # e.g. "alert", "jobs", "search", "sources"
     sub, sub_opts = get_subcommand(data.get("options"))
     options = parse_options(sub_opts)
     container = request.app.state.container
     session_factory = request.app.state.session_factory
 
-    response_payload = await dispatch(sub, options, container, session_factory)
+    response_payload = await dispatch(command_name, sub, options, container, session_factory)
 
-    # Special handling for /alert run — defer the work so we hit the 3s window.
-    if sub == "run" and response_payload.get("type") == 5:
+    # Special handling for deferred commands — defer the work so we hit the 3s window.
+    if response_payload.get("type") == 5:
         application_id = payload.get("application_id", "")
         interaction_token = payload.get("token", "")
-        alert_id = options.get("alert_id", "")
-        if application_id and interaction_token and alert_id:
-            asyncio.create_task(
-                _run_alert_background(
-                    alert_id,
-                    application_id,
-                    interaction_token,
-                    settings.discord_bot_token,
-                    container,
-                    session_factory,
+
+        # /alert run — execute alert in the background.
+        if command_name == "alert" and sub == "run":
+            alert_id = options.get("alert_id", "")
+            if application_id and interaction_token and alert_id:
+                asyncio.create_task(
+                    _run_alert_background(
+                        alert_id,
+                        application_id,
+                        interaction_token,
+                        settings.discord_bot_token,
+                        container,
+                        session_factory,
+                    )
                 )
-            )
+
+        # /search create — execute search in the background.
+        elif command_name == "search" and sub == "create":
+            if application_id and interaction_token:
+                asyncio.create_task(
+                    _run_search_background(
+                        options,
+                        application_id,
+                        interaction_token,
+                        settings.discord_bot_token,
+                        container,
+                        session_factory,
+                    )
+                )
 
     return Response(
         status_code=status.HTTP_200_OK,

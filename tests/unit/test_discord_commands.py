@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.container import Container
 from app.core.database import Base
 from app.discord.commands import (
-    COMMAND_REGISTRY,
+    ALERT_COMMAND_REGISTRY,
     _embed,
     _embed_error,
     _error_response,
@@ -64,8 +64,11 @@ class TestGetSubcommand:
 
 
 class TestRegistry:
-    def test_all_four_commands_registered(self):
-        assert set(COMMAND_REGISTRY.keys()) == {"create", "list", "run", "test"}
+    def test_all_commands_registered(self):
+        assert set(ALERT_COMMAND_REGISTRY.keys()) == {
+            "create", "list", "run", "test",
+            "info", "delete", "toggle", "executions", "edit",
+        }
 
 
 class TestDispatch:
@@ -73,23 +76,29 @@ class TestDispatch:
         # Required: name, q
         options = {"name": "Test", "q": "flutter"}
         result = asyncio.run(
-            dispatch("create", options, container, container.session_factory)
+            dispatch("alert", "create", options, container, container.session_factory)
         )
         assert result["type"] == 4
         assert "embeds" in result["data"]
 
     def test_dispatches_list_empty(self, container: Container):
         result = asyncio.run(
-            dispatch("list", {}, container, container.session_factory)
+            dispatch("alert", "list", {}, container, container.session_factory)
         )
         assert result["type"] == 4
         assert "No alerts" in result["data"]["embeds"][0]["description"]
 
     def test_unknown_subcommand(self, container: Container):
         result = asyncio.run(
-            dispatch("bogus", {}, container, container.session_factory)
+            dispatch("alert", "bogus", {}, container, container.session_factory)
         )
-        assert "Unknown subcommand" in result["data"]["embeds"][0]["description"]
+        assert "Unknown" in result["data"]["embeds"][0]["description"]
+
+    def test_unknown_command_group(self, container: Container):
+        result = asyncio.run(
+            dispatch("bogus", "x", {}, container, container.session_factory)
+        )
+        assert "Unknown command" in result["data"]["embeds"][0]["description"]
 
 
 class TestEmbeds:

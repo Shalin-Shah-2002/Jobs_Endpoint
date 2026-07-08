@@ -225,7 +225,7 @@ class TestDispatch:
         )
         assert r.status_code == 200
         data = r.json()
-        assert "Unknown subcommand" in data["data"]["embeds"][0]["description"]
+        assert "Unknown alert subcommand" in data["data"]["embeds"][0]["description"]
 
     def test_unsupported_interaction_type(
         self, discord_enabled_client: TestClient, signing_key: SigningKey
