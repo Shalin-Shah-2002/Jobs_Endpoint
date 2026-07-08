@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+
 from fastapi import FastAPI
 
 from app.api.v1.router import health_router, register_exception_handlers, router as v1_router
